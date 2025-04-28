@@ -14,7 +14,7 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::config::MAX_APP_NUM;
+use crate::config::{MAX_APP_NUM,MAX_SYSCALL_NUM};
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
 use lazy_static::*;
@@ -45,6 +45,7 @@ pub struct TaskManagerInner {
     tasks: [TaskControlBlock; MAX_APP_NUM],
     /// id of current `Running` task
     current_task: usize,
+
 }
 
 lazy_static! {
@@ -54,6 +55,7 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            syscalls:[0;MAX_SYSCALL_NUM],
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -168,4 +170,34 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+///record syscalls
+pub fn record_syscalls(id:usize){
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    inner.tasks[current].syscalls[id]+=1;
+}
+
+///get task id addr usize
+pub fn get_u(id:*const u8)->isize{
+    unsafe{
+        let value:u8 = *id;
+        return value as isize;
+    }
+}
+
+///write data at current task addr id
+pub fn write_data(id:*mut u8,data:u8){
+    unsafe {
+        *id = data;
+    }
+
+}
+
+///get current task syscalls
+pub fn get_syscalls(id:usize)-> usize{
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    inner.tasks[current].syscalls[id]
 }

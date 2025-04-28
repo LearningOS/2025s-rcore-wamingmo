@@ -1,9 +1,11 @@
 //! File and filesystem-related syscalls
+use crate::task::record_syscalls;
 
 const FD_STDOUT: usize = 1;
 
 /// write buf of length `len`  to a file with `fd`
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
+    record_syscalls(64);
     trace!("kernel: sys_write");
     match fd {
         FD_STDOUT => {
