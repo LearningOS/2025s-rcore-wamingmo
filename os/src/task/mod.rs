@@ -202,3 +202,32 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
 }
+
+///set syscalls
+pub fn record_syscalls(sys_id:usize){
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    inner.tasks[current].syscalls[sys_id]+=1;
+}
+
+///get syscalls
+pub fn get_syscalls(sys_id:usize)->isize{
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    inner.tasks[current].syscalls[sys_id] as isize
+}
+
+///write data
+pub fn write_data(addr:*mut u8,data:u8)->isize{
+    unsafe{
+        *addr = data;
+    }
+    0
+}
+
+///read data
+pub fn read_data(addr:*const u8)->isize{
+    unsafe{
+        let data:u8 = *addr;
+    }
+}
