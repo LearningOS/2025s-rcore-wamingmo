@@ -113,6 +113,7 @@ impl PageTable {
             }
             ppn = pte.ppn();
         }
+        //trace!("in page table find pte crate");
         result
     }
     /// Find PageTableEntry by VirtPageNum
@@ -135,17 +136,24 @@ impl PageTable {
     }
     /// set the map between virtual page number and physical page number
     #[allow(unused)]
-    pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+    pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags)->isize {
+        //trace!("in page table map");
         let pte = self.find_pte_create(vpn).unwrap();
-        assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn);
+        if pte.is_valid() {
+            return -1;
+        }
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
+        0
     }
     /// remove the map between virtual page number and physical page number
     #[allow(unused)]
-    pub fn unmap(&mut self, vpn: VirtPageNum) {
+    pub fn unmap(&mut self, vpn: VirtPageNum)->isize {
         let pte = self.find_pte(vpn).unwrap();
-        assert!(pte.is_valid(), "vpn {:?} is invalid before unmapping", vpn);
+        if !pte.is_valid(){
+            return -1;
+        }
         *pte = PageTableEntry::empty();
+        0
     }
     /// get the page table entry from the virtual page number
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {

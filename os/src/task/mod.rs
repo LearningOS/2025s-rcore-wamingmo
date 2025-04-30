@@ -14,6 +14,8 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use crate::config::PAGE_SIZE;
+use crate::mm::{VPNRange,VirtAddr,MapPermission};
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
@@ -217,17 +219,53 @@ pub fn get_syscalls(sys_id:usize)->isize{
     inner.tasks[current].syscalls[sys_id] as isize
 }
 
-///write data
-pub fn write_data(addr:*mut u8,data:u8)->isize{
-    unsafe{
-        *addr = data;
-    }
-    0
+///write data from virtaddr
+pub fn write_data(addr:usize,data:u8)->isize{
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    trace!("in task mod write_data,addr:{},data:{}",addr,data);
+    inner.tasks[current].memory_set.write_data(addr,data)
+    
 }
 
-///read data
-pub fn read_data(addr:*const u8)->isize{
-    unsafe{
-        let data:u8 = *addr;
+///read data from virtaddr
+pub fn read_data(addr:usize)->isize{
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    trace!("in task mod read_data,addr:{}",addr);
+    inner.tasks[current].memory_set.read_data(addr)
+}
+
+
+
+///mmap
+pub fn mmap(start:usize,len:usize,port:usize)->isize{
+    if port == 0 ||start % PAGE_SIZE!= 0||port & !0x7 != 0||port & 0x7 ==0{
+        return -1;
     }
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+
+    let mut per:MapPermission = MapPermission::U;
+    
+    if port &1 != 0 {
+        per |= MapPermission::R;
+    }
+    if port & 2 != 0 {
+        per |= MapPermission::W;
+    }
+    if port &4 != 0 {
+        per |= MapPermission::X;
+    }
+    trace!("in mmap, to be insert,start:{},len:{},port:{}",start,len,port);
+    inner.tasks[current].memory_set.insert_framed_area(VirtAddr::from(start),VirtAddr::from(start+len),per)
+
+}
+
+///munmap
+pub fn munmap(start:usize,len:usize)->isize {
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    let vpn_range = VPNRange::new(VirtAddr::from(start).floor(),VirtAddr::from(start+len).ceil());
+    inner.tasks[current].memory_set.munmap_from_vpnrange(vpn_range)
 }
