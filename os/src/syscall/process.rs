@@ -56,7 +56,7 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
     trace!("_trace_request:{},_id:{},_data:{}",_trace_request,_id,_data);
     match _trace_request {
         0=>{
-            trace!("in match,to read_data");
+            //trace!("in match,to read_data");
             read_data(_id)
         },
         1=>{
@@ -64,7 +64,7 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
             write_data(_id,_data as u8)
         },
         2=>{
-            trace!("in match,to get_syscalls");
+            //trace!("in match,to get_syscalls");
             get_syscalls(_id)
         },
         _=>-1

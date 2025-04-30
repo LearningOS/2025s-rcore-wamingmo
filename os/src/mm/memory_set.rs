@@ -1,7 +1,7 @@
 //! Implementation of [`MapArea`] and [`MemorySet`].
 
 use super::{frame_alloc, FrameTracker};
-use super::{PTEFlags, PageTable, PageTableEntry,translated_byte_buffer};
+use super::{PTEFlags, PageTable, PageTableEntry};//,translated_byte_buffer
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
 use crate::config::{
@@ -64,7 +64,7 @@ impl MemorySet {
         )
     }
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>)->isize {
-        trace!("in memory set push");
+        //trace!("in memory set push");
         let success = map_area.map(&mut self.page_table);
         if success == -1 {
             return success;
@@ -80,32 +80,36 @@ impl MemorySet {
     pub fn write_data(&mut self,addr:usize,data:u8)->isize{
         let mut writable: bool = false;
         let vpn = VirtAddr::from(addr).floor();
-        for area in self.areas.iter()
-        {
-            if vpn >= area.vpn_range.get_start() && vpn <= area.vpn_range.get_end()
-            {
-                let bits = (area.map_perm & (MapPermission::U | MapPermission::W)).bits();
-                if bits != 0 {
-                    trace!("in write_data for_if_if");
-                    writable = true;
-                    break;
-                }
+        let offset = VirtAddr::from(addr).page_offset();
+        if let Some(pte) = self.page_table.translate(vpn){
+            let ppn = pte.ppn();
+            if pte.is_valid() && pte.userful() && pte.writable(){
+                writable = true;
             }
-        };
-        
-        if writable {
-            let dsts = translated_byte_buffer(self.page_table.token(),addr as*const u8,core::mem::size_of_val(&addr));
-            for dst in dsts.into_iter(){
-                unsafe{
-                    let dd = dst.as_mut_ptr() as *mut u8;
-                    *dd = data;
+            let pa = (ppn.0 << 12 ) | offset;
+            //trace!("pa:{}",pa);
+            let to_write = pa as * mut u8;
+            if writable {
+                // let dsts = translated_byte_buffer(self.page_table.token(),addr as*const u8,core::mem::size_of_val(&addr));
+                // for dst in dsts.into_iter(){
+                //     unsafe{
+                //         let dd = dst.as_mut_ptr() as *mut u8;
+                //         *dd = data;
+                //     }
+                // }
+                unsafe {
+                    *to_write = data;
                 }
+                0
             }
-            0
+            else{
+                -1
+            }
         }
-        else{
+        else {
             -1
         }
+        
     }
 
     ///read data from virtaddr
@@ -114,31 +118,31 @@ impl MemorySet {
         let mut readable: bool = false;
         let vpn = VirtAddr::from(addr).floor();
         let offset = VirtAddr::from(addr).page_offset();
-        let mut ppn: PhysPageNum = PhysPageNum::from(0);
-        for area in self.areas.iter()
-        {
-            if  vpn >= area.vpn_range.get_start() && vpn <= area.vpn_range.get_end()
-            {
-                let bits = (area.map_perm & (MapPermission::U | MapPermission::R)).bits();
-                if  bits != 0 {
-                    //trace!("in read_data for_if_if");
-                    readable = true;
-                    ppn = area.data_frames[&vpn].ppn;
-                    break;
+        if let Some(pte) = self.page_table.translate(vpn){
+            let ppn = pte.ppn();
+            if pte.is_valid() && pte.userful() && pte.readable(){
+                readable = true;
+            }
+            //trace!("in memory_set read_dat ppn:{},page_offset:{}",ppn.0,offset);
+            let pa = (ppn.0 << 12 ) | offset;
+            //trace!("pa:{}",pa);
+            let to_read = pa as *const u8;
+            if readable {
+                unsafe{
+                    //trace!("in read_data unsafe");
+                    let data:u8 = *to_read;
+                    return data as isize;
                 }
             }
-        };
-        let pa = PhysAddr::from(ppn.0 | offset).0 as * const u8;
-        if readable {
-            unsafe{
-                //trace!("in read_data unsafe");
-                let data:u8 = *pa;
-                return data as isize;
+            else {
+                -1
             }
         }
         else {
             -1
         }
+
+        
         
     }
 

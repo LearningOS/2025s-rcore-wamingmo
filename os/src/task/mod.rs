@@ -232,7 +232,6 @@ pub fn write_data(addr:usize,data:u8)->isize{
 pub fn read_data(addr:usize)->isize{
     let inner = TASK_MANAGER.inner.exclusive_access();
     let current = inner.current_task;
-    trace!("in task mod read_data,addr:{}",addr);
     inner.tasks[current].memory_set.read_data(addr)
 }
 
