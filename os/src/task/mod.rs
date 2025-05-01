@@ -118,6 +118,9 @@ pub fn add_initproc() {
 
 /// mmap
 pub fn mmap(start:usize,len:usize,port:usize)->isize{
+    if port == 0 ||start % PAGE_SIZE!= 0||port & !0x7 != 0||port & 0x7 ==0 {
+        return -1;
+    }
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access();
     inner.memory_set.mmap(start,len,port) 
