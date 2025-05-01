@@ -60,6 +60,18 @@ impl MemorySet {
             None,
         );
     }
+
+    ///mmap in memory_set
+    pub fn mmap(start:usize,len:usize,port:usize)->isize{
+        
+    }
+
+    ///munmap in memory_set
+    pub fn munmap(start:usize,len:usize)->isize{
+
+    }
+
+
     /// remove a area
     pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
         if let Some((idx, area)) = self

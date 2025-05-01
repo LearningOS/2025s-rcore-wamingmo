@@ -2,16 +2,17 @@
 use alloc::sync::Arc;
 
 use crate::{
+    timer::get_time_us,
     loader::get_app_data_by_name,
-    mm::{translated_refmut, translated_str},
+    mm::{translated_refmut, translated_str,translated_byte_buffer},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next,
+        suspend_current_and_run_next,mmap,munmap,
     },
 };
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug,Copy,Clone)]
 pub struct TimeVal {
     pub sec: usize,
     pub usec: usize,
@@ -110,7 +111,20 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
         "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let us = get_time_us();
+    let time = TimeVal{
+        sec:us/1_000_000,
+        usec:us % 1_000_000,
+    };
+    let token = current_user_token();
+    let dsts = translated_byte_buffer(token,_ts as * const u8,core::mem::size_of_val(&_ts));
+    for dst in dsts.into_iter() {
+        unsafe{
+            let tt = dst.as_mut_ptr() as * mut TimeVal;
+            *tt = time;
+        }
+    }
+    0
 }
 
 /// YOUR JOB: Implement mmap.
@@ -119,7 +133,7 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
         "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    mmap(_start,_len,_port)   
 }
 
 /// YOUR JOB: Implement munmap.
@@ -128,7 +142,7 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
         "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    munmap(_start,_len)
 }
 
 /// change data segment size

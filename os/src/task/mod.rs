@@ -115,3 +115,17 @@ lazy_static! {
 pub fn add_initproc() {
     add_task(INITPROC.clone());
 }
+
+/// mmap
+pub fn mmap(start:usize,len:usize,port:usize)->isize{
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.memory_set.mmap(start,len,port) 
+}
+
+///munmap
+pub fn munmap(start:usize,len:usize)->isize {
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.memory_set.munmap(start,len)
+}
