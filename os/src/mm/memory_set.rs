@@ -413,7 +413,7 @@ impl MapArea {
         page_table.unmap(vpn);
     }
     pub fn map(&mut self, page_table: &mut PageTable)->isize {
-        let success: isize = 0;
+        let mut success: isize = 0;
         for vpn in self.vpn_range {
             success = self.map_one(page_table, vpn);
             if success == -1 {
@@ -430,14 +430,14 @@ impl MapArea {
     #[allow(unused)]
     pub fn shrink_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
         for vpn in VPNRange::new(new_end, self.vpn_range.get_end()) {
-            self.unmap_one(page_table, vpn)
+            self.unmap_one(page_table, vpn);
         }
         self.vpn_range = VPNRange::new(self.vpn_range.get_start(), new_end);
     }
     #[allow(unused)]
     pub fn append_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
         for vpn in VPNRange::new(self.vpn_range.get_end(), new_end) {
-            self.map_one(page_table, vpn)
+            self.map_one(page_table, vpn);
         }
         self.vpn_range = VPNRange::new(self.vpn_range.get_start(), new_end);
     }

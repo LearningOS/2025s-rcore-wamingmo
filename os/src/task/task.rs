@@ -1,7 +1,7 @@
 //! Types related to task management & Functions for completely changing TCB
 use super::TaskContext;
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
-use crate::config::TRAP_CONTEXT_BASE;
+use crate::config::{TRAP_CONTEXT_BASE,BIG_STIRDE};
 use crate::fs::{File, Stdin, Stdout};
 use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
@@ -10,6 +10,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefMut;
+use core::cmp::Ordering;
 
 /// Task control block structure
 ///
@@ -71,6 +72,9 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    ///task stride
+    pub task_stride: TaskStride,
 }
 
 pub struct TaskStride{
@@ -299,22 +303,27 @@ impl TaskControlBlock {
 }
 
 impl Eq for TaskControlBlock{}
+
 impl PartialEq for TaskControlBlock{
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self,other:&Self)->bool{
         self.inner_exclusive_access().task_stride.stride == other.inner_exclusive_access().task_stride.stride
     }
 }
-impl Ord for TaskControlBlock{
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.inner_exclusive_access().task_stride.stride.cmp(&other.inner_exclusive_access().task_stride.stride)
-    }
-}
-impl PartialOrd for TaskControlBlock{
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+
+impl Ord for TaskControlBlock {
+    ///self define ord
+    fn cmp(&self,other:&Self)-> Ordering{
+        other.inner_exclusive_access().task_stride.stride.cmp(&self.inner_exclusive_access().task_stride.stride)
     }
 }
 
+
+impl PartialOrd for TaskControlBlock{
+    ///self define partialord
+    fn partial_cmp(&self,other:&Self)->Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 #[derive(Copy, Clone, PartialEq)]
 /// task status: UnInit, Ready, Running, Exited
 pub enum TaskStatus {
