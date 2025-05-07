@@ -7,7 +7,7 @@ use crate::{
     mm::{translated_refmut, translated_str,translated_byte_buffer},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next,mmap,munmap,
+        suspend_current_and_run_next,mmap,munmap,TaskControlBlock,
     },
 };
 
@@ -162,7 +162,23 @@ pub fn sys_spawn(_path: *const u8) -> isize {
         "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let token = current_user_token();
+    let path = translated_str(token, _path);
+    match get_app_data_by_name(path.as_str()){
+        Some(data)=>{
+            let new_task = Arc::new(TaskControlBlock::new(data));
+            let new_pid = new_task.pid.0;
+            // set new task to children
+            let current_task = current_task().unwrap();
+            let mut current_inner = current_task.inner_exclusive_access();
+            current_inner.children.push(new_task.clone());
+            //set new task's parent
+            new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&current_task));
+            add_task(new_task);
+            new_pid as isize
+        },
+        None=>-1
+    }
 }
 
 // YOUR JOB: Set task priority.
@@ -171,5 +187,11 @@ pub fn sys_set_priority(_prio: isize) -> isize {
         "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    if _prio <=1 {
+        return -1;
+    }
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.task_stride.set_prio(_prio as usize);
+    _prio
 }

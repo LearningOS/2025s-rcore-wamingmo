@@ -22,6 +22,7 @@ mod switch;
 mod task;
 
 use crate::loader::get_app_data_by_name;
+use crate::config::PAGE_SIZE;
 use alloc::sync::Arc;
 use lazy_static::*;
 pub use manager::{fetch_task, TaskManager};
