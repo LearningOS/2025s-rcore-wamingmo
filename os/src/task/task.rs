@@ -73,6 +73,39 @@ pub struct TaskControlBlockInner {
     pub program_brk: usize,
 }
 
+pub struct TaskStride{
+    /// stride
+    pub stride:usize,
+
+    /// pass
+    pub pass:usize,
+
+    ///task priority
+    pub priority:usize,
+}
+
+impl TaskStride{
+    ///new a TaskStride
+    pub fn new()->Self{
+        TaskStride{
+            stride:0,
+            priority:16,
+            pass:BIG_STIRDE/16,
+        }
+    }
+
+    ///set priority
+    pub fn set_priority(&mut self,prio:usize){
+        self.priority = prio;
+        self.pass = BIG_STIRDE/self.priority;
+    }
+
+    ///set stride
+    pub fn set_stride(&mut self){
+        self.stride += self.pass;
+    }
+}
+
 impl TaskControlBlockInner {
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
         self.trap_cx_ppn.get_mut()
@@ -135,6 +168,7 @@ impl TaskControlBlock {
                     ],
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    task_stride:TaskStride::new(),
                 })
             },
         };
@@ -216,6 +250,7 @@ impl TaskControlBlock {
                     fd_table: new_fd_table,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    task_stride: TaskStride::new()
                 })
             },
         });
@@ -260,6 +295,23 @@ impl TaskControlBlock {
         } else {
             None
         }
+    }
+}
+
+impl Eq for TaskControlBlock{}
+impl PartialEq for TaskControlBlock{
+    fn eq(&self, other: &Self) -> bool {
+        self.inner_exclusive_access().task_stride.stride == other.inner_exclusive_access().task_stride.stride
+    }
+}
+impl Ord for TaskControlBlock{
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.inner_exclusive_access().task_stride.stride.cmp(&other.inner_exclusive_access().task_stride.stride)
+    }
+}
+impl PartialOrd for TaskControlBlock{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
