@@ -4,15 +4,16 @@ use alloc::sync::Arc;
 
 use crate::{
     fs::{open_file, OpenFlags},
-    mm::{translated_refmut, translated_str},
+    mm::{translated_refmut, translated_str,translated_byte_buffer},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next,
+        suspend_current_and_run_next,TaskControlBlock,TaskStatus,
     },
+    timer::get_time_us,
 };
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug,Copy,Clone)]
 pub struct TimeVal {
     pub sec: usize,
     pub usec: usize,
@@ -110,7 +111,20 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
         "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let ti = get_time_us();
+    let time = TimeVal {
+        sec: ti / 1_000_000,
+        usec: ti % 1_000_000,
+    };
+    let token = current_user_token();
+    let dsts = translated_byte_buffer(token, _ts as *const u8, core::mem::size_of_val(&_ts));
+    for dst in dsts.into_iter() {
+        unsafe {
+            let t = dst.as_mut_ptr() as *mut TimeVal;
+            *t = time;
+        }
+    }
+    0
 }
 
 /// YOUR JOB: Implement mmap.
@@ -119,7 +133,9 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
         "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.memory_set.mmap(_start, _len, _port)
 }
 
 /// YOUR JOB: Implement munmap.
@@ -128,7 +144,9 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
         "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.memory_set.munmap(_start, _len)
 }
 
 /// change data segment size
@@ -148,7 +166,37 @@ pub fn sys_spawn(_path: *const u8) -> isize {
         "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let token = current_user_token();
+    let path = translated_str(token, _path);
+    if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY){
+        println!("file name:{}",path.as_str());
+        let data = app_inode.read_all();
+        //debug!("get {} data ok",path.as_str());
+        let new_task = Arc::new(TaskControlBlock::new(data.as_slice()));
+        
+        let new_pid = new_task.pid.0;
+
+        // set new task to children
+        let current_task = current_task().unwrap();
+        let mut current_inner = current_task.inner_exclusive_access();
+        current_inner.children.push(new_task.clone());
+
+        new_task.inner_exclusive_access().fd_table = Vec::new();
+        for fd in current_inner.fd_table.iter() {
+            if let Some(file) = fd {
+                new_task.inner_exclusive_access().fd_table.push(Some(file.clone()));
+            } else {
+                new_task.inner_exclusive_access().fd_table.push(None);
+            }
+        }
+        //set new task's parent
+        new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&current_task));
+        add_task(new_task);
+        new_pid as isize
+    }
+    else {
+        -1
+    }
 }
 
 // YOUR JOB: Set task priority.
@@ -157,5 +205,11 @@ pub fn sys_set_priority(_prio: isize) -> isize {
         "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    if _prio <= 1 {
+        return -1;
+    }
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.task_stride.set_priority(_prio as usize);
+    _prio
 }
