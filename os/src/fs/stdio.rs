@@ -55,5 +55,5 @@ impl File for Stdout {
             print!("{}", core::str::from_utf8(*buffer).unwrap());
         }
         user_buf.len()
-    }
+    }    
 }
